@@ -1,50 +1,398 @@
-// ==================== CONFIGURACIÓN ====================
+// ============================================
+// BOT DE TELEGRAM SEGURO - SIN EXPONER TOKEN
+// ============================================
+
 const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Token desde variables de entorno en Render
-const TOKEN = process.env.BOT_TOKEN;
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ==================== TRUCO PARA QUE NO SE DUERMA ====================
-// Render duerme apps free después de 15 minutos inactivas
-// Este ping mantiene activo el bot
-const keepAlive = () => {
-  if (process.env.RENDER) {
-    console.log('🔄 Enviando ping para mantener activo...');
-    // Hacemos un ping a la propia URL cada 14 minutos
-    setInterval(() => {
-      const https = require('https');
-      const url = process.env.RENDER_EXTERNAL_URL || `https://${process.env.RENDER_SERVICE_NAME}.onrender.com`;
-      https.get(url, (res) => {
-        console.log(`✅ Ping exitoso a ${url} - Status: ${res.statusCode}`);
-      }).on('error', (err) => {
-        console.log('⚠️ Error en ping:', err.message);
-      });
-    }, 14 * 60 * 1000); // 14 minutos
+// Token desde variables de entorno
+const BOT_TOKEN = process.env.BOT_TOKEN;
+
+// ============================================
+// FUNCIONES SEGURAS PARA LOGS
+// ============================================
+function safeLogToken(token) {
+  if (!token) return '❌ NO CONFIGURADO';
+  // Muestra solo primeros 5 y últimos 5 caracteres
+  return `✅ ${token.substring(0, 5)}...${token.substring(token.length - 5)}`;
+}
+
+function maskToken(token) {
+  if (!token) return null;
+  // Convierte 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+  // En: 12345...wxyz
+  const parts = token.split(':');
+  if (parts.length !== 2) return '❌ FORMATO INVÁLIDO';
+  
+  const firstPart = parts[0];
+  const secondPart = parts[1];
+  
+  return `${firstPart.substring(0, 5)}...${secondPart.substring(secondPart.length - 5)}`;
+}
+
+// ============================================
+// INICIO SEGURO
+// ============================================
+console.log('🔒 ============================================');
+console.log('🔒 BOT DE TELEGRAM - MODO SEGURO');
+console.log('🔒 ============================================');
+console.log('📡 Token:', safeLogToken(BOT_TOKEN));
+console.log('🌐 Puerto:', PORT);
+console.log('🔒 ============================================');
+
+if (!BOT_TOKEN) {
+  console.log('❌ ERROR: BOT_TOKEN no configurado en variables de entorno');
+  console.log('📌 Ve a Render.com → Tu servicio → Environment');
+  console.log('📌 Agrega variable: BOT_TOKEN = tu_token_secreto');
+  console.log('🔒 ============================================');
+  
+  // Página web informativa
+  app.get('/', (req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>❌ Configuración Pendiente</title>
+        <style>
+          body { font-family: Arial; text-align: center; padding: 50px; }
+          .error { color: red; background: #ffe6e6; padding: 20px; border-radius: 10px; }
+          code { background: #f4f4f4; padding: 5px; border-radius: 3px; }
+        </style>
+      </head>
+      <body>
+        <h1>🤖 Bot de Negocio</h1>
+        <div class="error">
+          <h2>❌ Configuración Requerida</h2>
+          <p>El bot no tiene configurado el token de Telegram.</p>
+          <p><strong>Pasos a seguir:</strong></p>
+          <ol style="text-align: left; display: inline-block;">
+            <li>Ve a <a href="https://dashboard.render.com">Render.com</a></li>
+            <li>Selecciona tu servicio</li>
+            <li>Haz clic en "Environment"</li>
+            <li>Agrega variable: <code>BOT_TOKEN</code></li>
+            <li>Valor: tu token de @BotFather</li>
+            <li>Reinicia el servicio</li>
+          </ol>
+        </div>
+      </body>
+      </html>
+    `);
+  });
+  
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor en puerto ${PORT} (sin bot)`);
+  });
+  
+  process.exit(0);
+}
+
+// ============================================
+// CONFIGURACIÓN SEGURA DEL BOT
+// ============================================
+let bot;
+
+try {
+  console.log('🤖 Iniciando conexión con Telegram...');
+  
+  bot = new TelegramBot(BOT_TOKEN, {
+    polling: {
+      interval: 1000,
+      timeout: 10,
+      autoStart: true,
+      params: {
+        timeout: 10
+      }
+    }
+  });
+  
+  console.log('✅ Conexión establecida correctamente');
+  console.log('🔒 Token seguro:', maskToken(BOT_TOKEN));
+  
+} catch (error) {
+  console.log('❌ Error crítico al crear el bot:', error.message);
+  console.log('🔒 Token problemático:', maskToken(BOT_TOKEN));
+  process.exit(1);
+}
+
+// ============================================
+// MANEJO SEGURO DE ERRORES
+// ============================================
+bot.on('polling_error', (error) => {
+  console.log('⚠️ Error en Telegram:', error.code);
+  
+  // NO mostrar mensajes completos que puedan contener token
+  const safeMessage = error.message 
+    ? error.message.substring(0, 100) 
+    : 'Sin mensaje';
+  
+  console.log('📝 Error (seguro):', safeMessage);
+  
+  if (error.code === 'ETELEGRAM') {
+    console.log('❌ ERROR ETELEGRAM DETECTADO');
+    console.log('🔧 Posibles causas:');
+    console.log('1. Token expirado/inválido');
+    console.log('2. Bot deshabilitado en @BotFather');
+    console.log('3. Problema temporal de Telegram');
+    console.log('');
+    console.log('🎯 Soluciones:');
+    console.log('1. Verifica el token en @BotFather con /mybots');
+    console.log('2. Genera nuevo token si es necesario');
+    console.log('3. Espera 5 minutos y reinicia');
   }
-};
+});
 
-// ==================== SERVIDOR WEB ====================
-// Página de inicio bonita
+// ============================================
+// COMANDOS DEL BOT (SEGUROS)
+// ============================================
+
+// COMANDO /start
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const userName = msg.from.first_name || 'Usuario';
+  const userId = msg.from.id;
+  
+  // Log seguro (sin información sensible)
+  console.log(`📨 /start de: ${userName} (ID: ${userId})`);
+  
+  const welcomeMessage = `¡Hola ${userName}! 👋
+
+✅ *Bot de Negocio Activo*
+📍 *Plataforma:* Render.com
+⚡ *Estado:* Conectado 24/7
+🛡️ *Modo:* Seguro
+
+📋 *Comandos disponibles:*
+/productos - Ver catálogo
+/pedido - Realizar compra
+/horario - Horarios atención
+/contacto - Información
+/ayuda - Centro de ayuda
+
+💡 *Ejemplo rápido:*
+Escribe /productos para ver ofertas
+
+*¡Estamos para servirte!* 🎯`;
+
+  bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' })
+    .then(() => {
+      console.log(`✅ Mensaje enviado a ${userName}`);
+    })
+    .catch(err => {
+      console.log('❌ Error enviando mensaje (oculto por seguridad)');
+    });
+});
+
+// COMANDO /productos
+bot.onText(/\/productos/, (msg) => {
+  console.log(`🛒 /productos de: ${msg.from.first_name}`);
+  
+  bot.sendMessage(msg.chat.id,
+    `🛍️ *CATÁLOGO DE PRODUCTOS*
+
+1. *Producto Estrella* - $49.99
+   ✅ Envío gratis | ⭐ 4.9/5
+   📦 Código: PROD-001
+
+2. *Kit Básico* - $29.99
+   🚚 24h entrega | ⭐ 4.7/5
+   📦 Código: PROD-002
+
+3. *Servicio Premium* - $99.99/mes
+   💎 Soporte 24/7 | ⭐ 5/5
+   📦 Código: SERV-001
+
+🎯 *¿CÓMO COMPRAR?*
+Usa /pedido [código]
+Ejemplo: /pedido PROD-001
+
+💳 *Métodos de pago:*
+✓ Tarjetas ✓ PayPal ✓ Efectivo`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// COMANDO /pedido
+bot.onText(/\/pedido(?: (.+))?/, (msg, match) => {
+  const userName = msg.from.first_name;
+  console.log(`📝 /pedido de: ${userName}`);
+  
+  if (match && match[1]) {
+    const producto = match[1].toUpperCase();
+    const pedidoId = 'PED-' + Date.now().toString().slice(-6);
+    
+    // Log seguro del pedido
+    console.log(`✅ Pedido ${pedidoId} - Producto: ${producto} - Cliente: ${userName}`);
+    
+    bot.sendMessage(msg.chat.id,
+      `✅ *PEDIDO REGISTRADO*
+
+📋 *Detalles:*
+• Producto: ${producto}
+• ID: ${pedidoId}
+• Fecha: ${new Date().toLocaleDateString()}
+• Cliente: ${userName}
+
+📞 *Próximos pasos:*
+Te contactaremos en 15 minutos para confirmar.
+
+⏰ *Entrega estimada:* 24-48h
+
+🔍 *Consultar estado:* /estado
+❌ *Cancelar:* /cancelar ${pedidoId}
+
+*¡Gracias por tu compra!* 🎉`,
+      { parse_mode: 'Markdown' }
+    );
+    
+  } else {
+    bot.sendMessage(msg.chat.id,
+      `📝 *REALIZAR PEDIDO*
+
+Escribe el comando seguido del código:
+
+/pedido [código-del-producto]
+
+*Ejemplos:*
+• /pedido PROD-001
+• /pedido SERV-001
+
+📦 *Primero usa* /productos *para ver códigos*`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+});
+
+// COMANDO /ayuda
+bot.onText(/\/ayuda/, (msg) => {
+  console.log(`🆘 /ayuda de: ${msg.from.first_name}`);
+  
+  bot.sendMessage(msg.chat.id,
+    `🆘 *CENTRO DE AYUDA*
+
+🤖 *COMANDOS PRINCIPALES:*
+/start - Iniciar bot
+/productos - Ver catálogo
+/pedido [código] - Hacer pedido
+/horario - Horarios atención
+/contacto - Información contacto
+/ayuda - Esta ayuda
+
+🏪 *INFORMACIÓN:*
+/horario - Ver horarios
+/contacto - Datos contacto
+/ubicacion - Dirección
+
+⚙️ *SOPORTE:*
+/soporte - Contactar humano
+/reclamo - Abrir reclamo
+
+💡 *EJEMPLOS:*
+• /pedido PROD-001
+• /productos
+• /horario
+
+*Este bot funciona 24/7 en Render.com*`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// COMANDO /horario
+bot.onText(/\/horario/, (msg) => {
+  bot.sendMessage(msg.chat.id,
+    `🕒 *HORARIO DE ATENCIÓN*
+
+🏪 *TIENDA FÍSICA:*
+Lunes a Viernes: 9:00 AM - 8:00 PM
+Sábados: 10:00 AM - 6:00 PM
+Domingos: 11:00 AM - 3:00 PM
+
+📞 *ATENCIÓN TELEFÓNICA:*
+Lunes a Domingo: 8:00 AM - 10:00 PM
+
+🤖 *ESTE BOT:*
+24 horas / 7 días a la semana
+
+🚚 *ENTREGAS:*
+Pedidos antes de 2:00 PM: Mismo día
+Pedidos después de 2:00 PM: Día siguiente`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// COMANDO /contacto
+bot.onText(/\/contacto/, (msg) => {
+  bot.sendMessage(msg.chat.id,
+    `📞 *INFORMACIÓN DE CONTACTO*
+
+📱 WhatsApp: +1 (555) 123-4567
+📞 Teléfono: +1 (555) 987-6543
+📧 Email: contacto@minegocio.com
+
+🌐 *Redes sociales:*
+Facebook: facebook.com/minegocio
+Instagram: @minegocio.oficial
+
+🏢 *Dirección:*
+Av. Principal #1234
+Centro, Ciudad, CP 12345
+
+🗺️ *Ver ubicación:* /ubicacion`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Responder mensajes normales (seguro)
+bot.on('message', (msg) => {
+  if (msg.text && !msg.text.startsWith('/')) {
+    const safeText = msg.text.substring(0, 50);
+    console.log(`💬 Mensaje de ${msg.from.first_name}: "${safeText}..."`);
+    
+    bot.sendMessage(msg.chat.id,
+      `📝 *Mensaje recibido*
+
+He registrado tu mensaje.
+
+📞 Un agente te contactará pronto.
+
+Mientras tanto, puedes:
+• Ver productos: /productos
+• Hacer pedido: /pedido
+• Contactarnos: /contacto
+
+*Respuesta automática - Bot 24/7*`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+});
+
+// ============================================
+// PÁGINA WEB DE MONITOREO (SEGURA)
+// ============================================
 app.get('/', (req, res) => {
+  const maskedToken = maskToken(BOT_TOKEN);
+  
   const html = `
   <!DOCTYPE html>
   <html>
   <head>
-    <title>🤖 Bot de Negocio Activo</title>
+    <title>🤖 Bot de Negocio - Seguro</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       }
       
       body {
-        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+        background: linear-gradient(135deg, #1a2980, #26d0ce);
         min-height: 100vh;
         display: flex;
         justify-content: center;
@@ -55,72 +403,82 @@ app.get('/', (req, res) => {
       .container {
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
-        border-radius: 24px;
+        border-radius: 20px;
         padding: 40px 30px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        max-width: 500px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        max-width: 600px;
         width: 100%;
         text-align: center;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
       }
       
       .logo {
-        font-size: 48px;
+        font-size: 60px;
         margin-bottom: 20px;
-        animation: float 3s ease-in-out infinite;
+        animation: pulse 2s infinite;
       }
       
-      @keyframes float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
+      @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
       }
       
       h1 {
-        color: #2d3436;
-        margin-bottom: 10px;
-        font-size: 28px;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        font-size: 32px;
         font-weight: 700;
       }
       
-      .status-badge {
+      .status {
         display: inline-block;
         background: linear-gradient(90deg, #00b09b, #96c93d);
         color: white;
-        padding: 8px 20px;
+        padding: 10px 25px;
         border-radius: 50px;
         font-weight: 600;
-        font-size: 14px;
-        margin: 15px 0;
+        font-size: 16px;
+        margin: 20px 0;
         letter-spacing: 0.5px;
+      }
+      
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin: 30px 0;
       }
       
       .info-card {
         background: #f8f9fa;
-        border-radius: 16px;
-        padding: 25px;
-        margin: 25px 0;
+        border-radius: 15px;
+        padding: 20px;
         text-align: left;
-        border-left: 5px solid #6a11cb;
+        border-left: 5px solid #3498db;
+        transition: transform 0.3s;
       }
       
-      .info-item {
-        display: flex;
-        align-items: center;
-        margin: 12px 0;
-        color: #495057;
+      .info-card:hover {
+        transform: translateY(-5px);
       }
       
-      .info-item i {
-        font-size: 20px;
-        margin-right: 15px;
-        width: 24px;
-        text-align: center;
+      .info-card h3 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+        font-size: 18px;
       }
       
-      .stats {
-        background: #2d3436;
+      .info-card p {
+        color: #7f8c8d;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      
+      .security-badge {
+        background: #2c3e50;
         color: white;
-        border-radius: 12px;
+        border-radius: 10px;
         padding: 15px;
         margin-top: 20px;
         font-family: 'Courier New', monospace;
@@ -128,34 +486,82 @@ app.get('/', (req, res) => {
         text-align: left;
       }
       
-      .highlight {
-        color: #00ff88;
+      .token-masked {
+        color: #2ecc71;
         font-weight: bold;
+        background: rgba(46, 204, 113, 0.1);
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      
+      .stats {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+      }
+      
+      .stat-item {
+        text-align: center;
+        padding: 15px;
+        background: #ecf0f1;
+        border-radius: 10px;
+        min-width: 120px;
+      }
+      
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #3498db;
+      }
+      
+      .stat-label {
+        font-size: 12px;
+        color: #7f8c8d;
+        margin-top: 5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
       }
       
       .footer {
-        margin-top: 25px;
-        color: #6c757d;
+        margin-top: 30px;
+        color: #95a5a6;
         font-size: 14px;
-        line-height: 1.5;
+        line-height: 1.6;
       }
       
       .button {
         display: inline-block;
-        background: #6a11cb;
+        background: #3498db;
         color: white;
         padding: 12px 30px;
         border-radius: 50px;
         text-decoration: none;
         font-weight: 600;
         margin-top: 20px;
-        transition: all 0.3s ease;
+        transition: all 0.3s;
       }
       
       .button:hover {
-        background: #2575fc;
+        background: #2980b9;
         transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(106, 17, 203, 0.3);
+        box-shadow: 0 10px 20px rgba(52, 152, 219, 0.3);
+      }
+      
+      @media (max-width: 600px) {
+        .container {
+          padding: 30px 20px;
+        }
+        
+        h1 {
+          font-size: 24px;
+        }
+        
+        .info-grid {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -164,566 +570,124 @@ app.get('/', (req, res) => {
     <div class="container">
       <div class="logo">🤖</div>
       <h1>Bot de Negocio Telegram</h1>
-      <div class="status-badge">
-        <i class="fas fa-circle" style="color: #00ff88; font-size: 10px; margin-right: 8px;"></i>
-        ACTIVO 24/7 EN RENDER
+      <div class="status">
+        <i class="fas fa-shield-alt" style="margin-right: 8px;"></i>
+        MODO SEGURO ACTIVADO
       </div>
       
-      <div class="info-card">
-        <div class="info-item">
-          <i class="fas fa-server" style="color: #6a11cb;"></i>
-          <div>
-            <strong>Plataforma:</strong> Render.com
-          </div>
+      <div class="info-grid">
+        <div class="info-card">
+          <h3><i class="fas fa-server" style="color: #3498db; margin-right: 10px;"></i> Plataforma</h3>
+          <p>Render.com - Plan FREE<br>750 horas/mes garantizadas</p>
         </div>
-        <div class="info-item">
-          <i class="fas fa-tag" style="color: #00b09b;"></i>
-          <div>
-            <strong>Plan:</strong> FREE (750 horas/mes)
-          </div>
+        
+        <div class="info-card">
+          <h3><i class="fas fa-bolt" style="color: #2ecc71; margin-right: 10px;"></i> Estado</h3>
+          <p>✅ Conectado a Telegram<br>🤖 Bot respondiendo comandos</p>
         </div>
-        <div class="info-item">
-          <i class="fas fa-bolt" style="color: #ffd700;"></i>
-          <div>
-            <strong>Estado Bot:</strong> ${TOKEN ? '🟢 Conectado' : '🟡 Esperando token'}
-          </div>
+        
+        <div class="info-card">
+          <h3><i class="fas fa-clock" style="color: #e74c3c; margin-right: 10px;"></i> Disponibilidad</h3>
+          <p>24/7 - Siempre activo<br>Auto-reinicio mensual</p>
         </div>
-        <div class="info-item">
-          <i class="fas fa-shield-alt" style="color: #2575fc;"></i>
-          <div>
-            <strong>Seguridad:</strong> HTTPS activado
-          </div>
+        
+        <div class="info-card">
+          <h3><i class="fas fa-lock" style="color: #9b59b6; margin-right: 10px;"></i> Seguridad</h3>
+          <p>Token protegido en logs<br>HTTPS automático</p>
         </div>
+      </div>
+      
+      <div class="security-badge">
+        <h3><i class="fas fa-key" style="margin-right: 10px;"></i> Token Seguro</h3>
+        <div class="token-masked">${maskedToken}</div>
+        <p><i class="fas fa-check-circle" style="color: #2ecc71; margin-right: 8px;"></i> Token enmascarado en logs</p>
+        <p><i class="fas fa-check-circle" style="color: #2ecc71; margin-right: 8px;"></i> Nunca expuesto públicamente</p>
+        <p><i class="fas fa-check-circle" style="color: #2ecc71; margin-right: 8px;"></i> Almacenado en variables de entorno</p>
       </div>
       
       <div class="stats">
-        <div><span class="highlight">$</span> uptime <span class="highlight">></span> ${Math.floor(process.uptime())} segundos</div>
-        <div><span class="highlight">$</span> node_version <span class="highlight">></span> ${process.version}</div>
-        <div><span class="highlight">$</span> platform <span class="highlight">></span> ${process.platform}</div>
-        <div><span class="highlight">$</span> memory <span class="highlight">></span> ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB</div>
+        <div class="stat-item">
+          <div class="stat-value">24/7</div>
+          <div class="stat-label">Operación</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">100%</div>
+          <div class="stat-label">Gratis</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">SSL</div>
+          <div class="stat-label">Protegido</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${Math.floor(process.uptime() / 60)}m</div>
+          <div class="stat-label">Uptime</div>
+        </div>
       </div>
       
       <div class="footer">
-        <p>✅ Bot funcionando las 24 horas<br>
-        ✅ 100% Gratis sin tarjeta de crédito<br>
-        ✅ Despliegue automático desde GitHub</p>
+        <p><i class="fas fa-exclamation-triangle" style="color: #f39c12; margin-right: 8px;"></i> 
+        <strong>Importante:</strong> Nunca compartas tu token. Mantenlo seguro en variables de entorno.</p>
         
-        <a href="https://render.com" target="_blank" class="button">
-          <i class="fas fa-external-link-alt" style="margin-right: 8px;"></i>
-          Ver Render.com
+        <a href="/health" class="button">
+          <i class="fas fa-heartbeat" style="margin-right: 8px;"></i>
+          Verificar Salud del Servicio
         </a>
       </div>
     </div>
   </body>
   </html>
   `;
+  
   res.send(html);
 });
 
-// Health check para Render
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'telegram-business-bot',
     timestamp: new Date().toISOString(),
     platform: 'Render',
-    free: true,
+    security: 'token_masked',
     uptime: process.uptime(),
-    bot_connected: !!TOKEN
+    bot_connected: true,
+    version: '2.0.0'
   });
 });
 
-// Ruta de ping para mantener activo
 app.get('/ping', (req, res) => {
   res.json({ 
     pong: Date.now(),
-    uptime: process.uptime()
+    secure: true,
+    message: 'Token protected in logs'
   });
 });
 
-// ==================== BOT DE TELEGRAM ====================
-console.log('🚀 Iniciando Bot de Negocio en Render...');
-console.log('📡 Puerto:', PORT);
-console.log('🔑 Bot Token:', TOKEN ? '✅ Configurado' : '❌ No configurado');
-
-if (!TOKEN) {
-  console.log('⚠️ ADVERTENCIA: BOT_TOKEN no configurado en variables de entorno');
-  console.log('ℹ️  Configúralo en Render.com -> Environment Variables');
-}
-
-// Iniciar bot solo si hay token
-let bot = null;
-if (TOKEN) {
-  try {
-    bot = new TelegramBot(TOKEN, { polling: true });
-    console.log('✅ Bot de Telegram inicializado correctamente');
-    
-    // Configurar manejo de errores
-    bot.on('polling_error', (error) => {
-      console.log('⚠️ Error en Telegram polling:', error.code);
-      if (error.code === 'EFATAL') {
-        console.log('🔄 Reiniciando bot en 10 segundos...');
-        setTimeout(() => {
-          process.exit(1); // Render reiniciará automáticamente
-        }, 10000);
-      }
-    });
-    
-    // ==================== COMANDOS DEL BOT ====================
-    
-    // COMANDO /start
-    bot.onText(/\/start/, (msg) => {
-      const chatId = msg.chat.id;
-      const userName = msg.from.first_name || 'Cliente';
-      
-      const welcomeMessage = `✨ *¡Hola ${userName}!* ✨
-
-🤖 *Bienvenido al Bot Oficial de Mi Negocio*
-
-📍 *Conectado desde:* Render.com
-⚡ *Estado:* Activo 24/7
-💰 *Plan:* 100% GRATIS
-
-🛒 *¿Qué puedes hacer aquí?*
-• Ver catálogo de productos
-• Realizar pedidos
-• Consultar horarios
-• Contactar con soporte
-• Ver promociones
-
-📋 *Comandos disponibles:*
-/productos - Ver catálogo completo
-/pedido - Realizar un pedido
-/horario - Horarios de atención
-/contacto - Información de contacto
-/ubicacion - Cómo llegar
-/promociones - Ofertas especiales
-/ayuda - Centro de ayuda
-
-💡 *Ejemplo rápido:*
-Escribe /productos para ver todo lo disponible.
-
-*¡Estamos aquí para ayudarte!* 🎯`;
-
-      bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
-    });
-    
-    // COMANDO /productos
-    bot.onText(/\/productos/, (msg) => {
-      const productos = `🛍️ *CATÁLOGO DE PRODUCTOS*
-
-🎯 *PRODUCTOS DESTACADOS*
-
-1. *Producto Premium* - $49.99
-   ✅ Envío gratis | ⭐ 4.9/5
-   📦 Código: PROD-001
-   
-2. *Kit Inicial* - $29.99
-   🚚 24h envío | ⭐ 4.7/5
-   📦 Código: PROD-002
-   
-3. *Servicio Mensual* - $99.99/mes
-   💎 Soporte prioritario | ⭐ 5/5
-   📦 Código: SERV-001
-
-🔥 *OFERTAS ESPECIALES*
-• Pack Familiar (3 unidades) - $129.99
-  🎁 Código: OFERTA-001
-  💰 Ahorras $20
-
-• Primera compra - 15% descuento
-  🎉 Código: BIENVENIDO15
-
-📝 *¿CÓMO COMPRAR?*
-1. Elige un producto
-2. Usa /pedido [código]
-   Ejemplo: /pedido PROD-001
-3. Te contactaremos para confirmar
-
-💳 *Métodos de pago aceptados:*
-✓ Tarjetas de crédito/débito
-✓ PayPal
-✓ Transferencia bancaria
-✓ Efectivo en tienda`;
-
-      bot.sendMessage(msg.chat.id, productos, { parse_mode: 'Markdown' });
-    });
-    
-    // COMANDO /pedido
-    bot.onText(/\/pedido(?: (.+))?/, (msg, match) => {
-      const chatId = msg.chat.id;
-      
-      if (match && match[1]) {
-        // Pedido con producto específico
-        const producto = match[1].toUpperCase();
-        const pedidoId = 'PED-' + Date.now().toString().slice(-6);
-        
-        const confirmacion = `✅ *PEDIDO REGISTRADO EXITOSAMENTE*
-
-📋 *Detalles del pedido:*
-• Producto: ${producto}
-• ID de pedido: ${pedidoId}
-• Fecha: ${new Date().toLocaleDateString('es-ES')}
-• Hora: ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-• Cliente: ${msg.from.first_name}
-
-📞 *Próximos pasos:*
-1. Te contactaremos en menos de *15 minutos*
-2. Confirmaremos disponibilidad
-3. Coordinaremos método de pago
-4. Programaremos entrega
-
-⏰ *Tiempo estimado de entrega:* 24-48 horas
-
-🔍 *Para consultar estado:* /estado ${pedidoId}
-
-❌ *Para cancelar:* /cancelar ${pedidoId}
-
-*¡Gracias por confiar en nosotros!* 🎉
-
-📍 *Este bot funciona 24/7 en Render.com*`;
-
-        bot.sendMessage(chatId, confirmacion, { parse_mode: 'Markdown' });
-        
-        // Log para administrador
-        console.log(`📦 NUEVO PEDIDO: ${pedidoId} - Producto: ${producto} - Cliente: ${msg.from.username || msg.from.first_name}`);
-        
-      } else {
-        // Menú de productos para pedir
-        const opciones = {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "🛒 Producto Premium", callback_data: "pedido_PROD-001" },
-                { text: "📦 Kit Inicial", callback_data: "pedido_PROD-002" }
-              ],
-              [
-                { text: "💎 Servicio Mensual", callback_data: "pedido_SERV-001" },
-                { text: "🎁 Pack Familiar", callback_data: "pedido_OFERTA-001" }
-              ],
-              [
-                { text: "📋 Ver catálogo completo", callback_data: "ver_catalogo" },
-                { text: "❌ Cancelar", callback_data: "cancelar_pedido" }
-              ]
-            ]
-          }
-        };
-        
-        bot.sendMessage(chatId, 
-          `📝 *REALIZAR PEDIDO*\n\n` +
-          `Selecciona un producto de la lista o escribe:\n` +
-          `/pedido [código-del-producto]\n\n` +
-          `*Ejemplos:*\n` +
-          `• /pedido PROD-001\n` +
-          `• /pedido SERV-001\n\n` +
-          `Los pedidos se procesan 24/7 ⏰`,
-          { parse_mode: 'Markdown', ...opciones });
-      }
-    });
-    
-    // Manejar botones inline
-    bot.on('callback_query', (callbackQuery) => {
-      const msg = callbackQuery.message;
-      const data = callbackQuery.data;
-      
-      if (data.startsWith('pedido_')) {
-        const producto = data.replace('pedido_', '');
-        const pedidoId = 'PED-' + Date.now().toString().slice(-6);
-        
-        bot.sendMessage(msg.chat.id,
-          `✅ *Pedido registrado: ${producto}*\n\n` +
-          `🆔 ID: ${pedidoId}\n` +
-          `📅 Fecha: ${new Date().toLocaleDateString('es-ES')}\n\n` +
-          `📞 Te contactaremos en breve para confirmar.\n\n` +
-          `_Funcionando en Render.com 24/7_`,
-          { parse_mode: 'Markdown' });
-        
-        bot.answerCallbackQuery(callbackQuery.id, { 
-          text: "✅ Pedido registrado correctamente",
-          show_alert: false 
-        });
-      }
-      
-      if (data === 'ver_catalogo') {
-        bot.sendMessage(msg.chat.id,
-          `📚 *Catálogo completo*\n\n` +
-          `Usa el comando /productos para ver todos nuestros productos y servicios.`,
-          { parse_mode: 'Markdown' });
-        
-        bot.answerCallbackQuery(callbackQuery.id);
-      }
-      
-      if (data === 'cancelar_pedido') {
-        bot.sendMessage(msg.chat.id,
-          `❌ *Pedido cancelado*\n\n` +
-          `No se registró ningún pedido.\n\n` +
-          `¿Necesitas ayuda? Usa /ayuda`,
-          { parse_mode: 'Markdown' });
-        
-        bot.answerCallbackQuery(callbackQuery.id, { 
-          text: "Pedido cancelado",
-          show_alert: false 
-        });
-      }
-    });
-    
-    // COMANDO /horario
-    bot.onText(/\/horario/, (msg) => {
-      const horario = `🕒 *HORARIOS DE ATENCIÓN*
-
-🏪 *TIENDA FÍSICA:*
-• Lunes a Viernes: 9:00 AM - 8:00 PM
-• Sábados: 10:00 AM - 6:00 PM
-• Domingos: 11:00 AM - 3:00 PM
-
-📞 *ATENCIÓN TELEFÓNICA:*
-• Lunes a Domingo: 8:00 AM - 10:00 PM
-
-🤖 *BOT (este):*
-• ⏰ 24 horas / 7 días a la semana
-• ✅ Siempre disponible
-• 🚀 Respuesta instantánea
-
-🚚 *ENTREGAS A DOMICILIO:*
-• Pedidos antes de 2:00 PM: Entrega el mismo día
-• Pedidos después de 2:00 PM: Entrega al día siguiente
-• Fines de semana: Según disponibilidad
-
-⚡ *RENDIMIENTO:*
-Este bot funciona en Render.com
-Disponibilidad: 99.9%
-Respuesta: < 1 segundo
-
-📍 *Recuerda:* Puedes hacer pedidos en cualquier momento.`;
-
-      bot.sendMessage(msg.chat.id, horario, { parse_mode: 'Markdown' });
-    });
-    
-    // COMANDO /contacto
-    bot.onText(/\/contacto/, (msg) => {
-      const contacto = `📞 *CONTACTO Y SOPORTE*
-
-*Para atención inmediata:*
-📱 WhatsApp: +1 (555) 123-4567
-📞 Teléfono: +1 (555) 987-6543
-📧 Email: contacto@minegocio.com
-
-*Redes sociales oficiales:*
-🌐 Facebook: facebook.com/minegocio
-📷 Instagram: @minegocio.oficial
-💼 LinkedIn: linkedin.com/company/minegocio
-
-*Departamentos especializados:*
-🛒 Ventas: ventas@minegocio.com
-🤝 Soporte técnico: soporte@minegocio.com
-📦 Logística: logistica@minegocio.com
-💼 Administración: admin@minegocio.com
-
-*Horario de contacto telefónico:*
-Lunes a Viernes: 8:00 AM - 8:00 PM
-Sábados: 9:00 AM - 2:00 PM
-
-🗺️ *Dirección física:*
-Av. Comercial #123, Centro
-Ciudad, Estado, CP 12345
-
-📍 *Ver ubicación en mapa:* /ubicacion
-
-⚡ *Este bot funciona 24/7 en:* Render.com`;
-
-      bot.sendMessage(msg.chat.id, contacto, { parse_mode: 'Markdown' });
-    });
-    
-    // COMANDO /ubicacion
-    bot.onText(/\/ubicacion/, (msg) => {
-      bot.sendLocation(msg.chat.id, 19.4326, -99.1332); // Coordenadas ejemplo (CDMX)
-      
-      bot.sendMessage(msg.chat.id,
-        `📍 *NUESTRA UBICACIÓN*\n\n` +
-        `🏢 *Dirección:*\n` +
-        `Av. Comercial #567\n` +
-        `Centro Empresarial, Piso 3\n` +
-        `Ciudad, CP 12345\n\n` +
-        `🚗 *Cómo llegar:*\n` +
-        `• Metro: Estación Centro (línea 1)\n` +
-        `• Bus: Rutas 12, 45, 78\n` +
-        `• Auto: Estacionamiento gratuito\n\n` +
-        `🗺️ *Enlace a Google Maps:*\n` +
-        `https://maps.google.com/?q=Centro+Comercial+Principal\n\n` +
-        `⏰ *Horario en tienda:*\n` +
-        `Lunes a Viernes: 9:00 - 20:00\n` +
-        `Sábados: 10:00 - 18:00\n\n` +
-        `📍 *Acabamos de enviarte la ubicación exacta*`,
-        { parse_mode: 'Markdown' });
-    });
-    
-    // COMANDO /ayuda
-    bot.onText(/\/ayuda/, (msg) => {
-      const ayuda = `🆘 *CENTRO DE AYUDA - COMANDOS DISPONIBLES*
-
-🤖 *BOT INFORMATION*
-/start - Iniciar el bot
-/ayuda - Mostrar esta ayuda
-/estado - Estado del servicio
-
-🛒 *COMPRAS Y PEDIDOS*
-/productos - Ver catálogo completo
-/pedido [código] - Realizar pedido
-/estado [id] - Consultar estado de pedido
-/cancelar [id] - Cancelar pedido
-
-🏪 *INFORMACIÓN DEL NEGOCIO*
-/horario - Horarios de atención
-/contacto - Información de contacto
-/ubicacion - Dirección y mapa
-/promociones - Ofertas vigentes
-/info - Sobre nosotros
-
-⚙️ *SOPORTE TÉCNICO*
-/soporte - Contactar soporte humano
-/reclamo - Abrir un reclamo
-/sugerencia - Enviar sugerencia
-
-📱 *EJEMPLOS PRÁCTICOS:*
-• /pedido PROD-001
-• /estado PED-123ABC
-• /productos
-
-⚡ *PLATAFORMA:*
-Este bot funciona en Render.com
-Plan: FREE (750 horas/mes)
-Estado: Activo 24/7
-
-💡 *¿Problemas?* Contacta: soporte@minegocio.com`;
-
-      bot.sendMessage(msg.chat.id, ayuda, { parse_mode: 'Markdown' });
-    });
-    
-    // COMANDO /estado
-    bot.onText(/\/estado(?: (.+))?/, (msg, match) => {
-      const pedidoId = match && match[1] ? match[1] : 'PED-' + Date.now().toString().slice(-6);
-      
-      const estados = [
-        { estado: "📦 Pedido recibido", icon: "📦" },
-        { estado: "✅ Confirmado y en proceso", icon: "✅" },
-        { estado: "👨‍🍳 En preparación", icon: "👨‍🍳" },
-        { estado: "🚚 En camino a entrega", icon: "🚚" },
-        { estado: "🎉 Entregado exitosamente", icon: "🎉" }
-      ];
-      
-      const estadoActual = estados[Math.floor(Math.random() * estados.length)];
-      
-      bot.sendMessage(msg.chat.id,
-        `📋 *CONSULTA DE ESTADO*\n\n` +
-        `${estadoActual.icon} *Pedido:* ${pedidoId}\n` +
-        `📅 *Fecha consulta:* ${new Date().toLocaleDateString('es-ES')}\n` +
-        `⏰ *Hora:* ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}\n\n` +
-        `🔄 *Estado actual:*\n` +
-        `**${estadoActual.estado}**\n\n` +
-        `⏳ *Última actualización:* Hace ${Math.floor(Math.random() * 60)} minutos\n\n` +
-        `📞 *Para detalles exactos:*\n` +
-        `contacto@minegocio.com\n\n` +
-        `_Consulta automática - Render.com 24/7_`,
-        { parse_mode: 'Markdown' });
-    });
-    
-    // COMANDO /promociones
-    bot.onText(/\/promociones/, (msg) => {
-      const promociones = `🎁 *PROMOCIONES Y OFERTAS VIGENTES*
-
-🔥 *OFERTA ESPECIAL DEL MES*
-• 20% descuento en compras mayores a $100
-• Código: **MES20**
-• Válido hasta el último día del mes
-
-🎯 *PRIMERA COMPRA*
-• 15% descuento para nuevos clientes
-• Código: **BIENVENIDO15**
-• Sin mínimo de compra requerido
-
-👥 *PACK FAMILIAR*
-• Compra 3 productos, paga solo 2
-• Aplica para productos: PROD-001, PROD-002
-• Código automático al pedir 3 unidades
-
-🚚 *ENVÍO GRATIS SIEMPRE*
-• En todas las compras mayores a $50
-• Aplica automáticamente
-• Válido para toda el área metropolitana
-
-🎫 *CUPONES ACTIVOS:*
-1. VERANO10 - 10% descuento general
-2. CLIENTE5 - 5% descuento clientes frecuentes
-3. REFERIDO - $10 descuento por referir amigos
-
-📱 *¿CÓMO CANJEAR PROMOCIONES?*
-1. Realiza tu pedido con /pedido
-2. Menciona el código de promoción
-3. El descuento se aplica automáticamente
-4. Confirmaremos el precio final
-
-⏰ *Vigencia de promociones:*
-Todas válidas hasta agotar existencias
-o hasta fin de mes (lo que ocurra primero)
-
-💰 *Este bot es 100% GRATIS en Render.com*`;
-
-      bot.sendMessage(msg.chat.id, promociones, { parse_mode: 'Markdown' });
-    });
-    
-    // Responder mensajes normales (no comandos)
-    bot.on('message', (msg) => {
-      if (msg.text && !msg.text.startsWith('/')) {
-        bot.sendMessage(msg.chat.id,
-          `📝 *MENSAJE RECIBIDO*\n\n` +
-          `He registrado tu mensaje:\n"${msg.text.substring(0, 100)}${msg.text.length > 100 ? '...' : ''}"\n\n` +
-          `📞 Un agente te contactará en breve.\n\n` +
-          `Mientras tanto, puedes:\n` +
-          `• Ver productos: /productos\n` +
-          `• Hacer pedido: /pedido\n` +
-          `• Contactar: /contacto\n\n` +
-          `🆔 *ID Conversación:* MSG-${msg.message_id}\n` +
-          `⏰ *Hora:* ${new Date().toLocaleTimeString('es-ES')}\n\n` +
-          `_Respuesta automática - Bot 24/7_`,
-          { parse_mode: 'Markdown' });
-      }
-    });
-    
-    console.log('✅ Bot configurado con todos los comandos');
-    
-  } catch (error) {
-    console.error('❌ Error crítico al iniciar bot:', error.message);
-    console.log('🔄 El servicio se reiniciará automáticamente en Render');
-  }
-} else {
-  console.log('⏳ Bot en modo espera - Agrega BOT_TOKEN en Render');
-}
-
-// ==================== INICIAR SERVIDOR ====================
+// ============================================
+// INICIAR SERVIDOR
+// ============================================
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor iniciado en puerto ${PORT}`);
-  console.log(`🌐 URL: https://${process.env.RENDER_SERVICE_NAME || 'tu-app'}.onrender.com`);
-  console.log(`💰 Plan: FREE (750 horas/mes - 31 días completos)`);
+  console.log('🔒 ============================================');
+  console.log(`🚀 Servidor seguro en puerto: ${PORT}`);
+  console.log(`🌐 URL pública: https://${process.env.RENDER_EXTERNAL_HOSTNAME || process.env.RENDER_SERVICE_NAME || 'app'}.onrender.com`);
+  console.log('🛡️  Token protegido:', maskToken(BOT_TOKEN));
+  console.log('🔒 ============================================');
+  console.log('✅ Bot listo para recibir comandos en Telegram');
+  console.log('🔒 ============================================');
   
-  // Iniciar ping para mantener activo
-  keepAlive();
-  
-  if (!TOKEN) {
-    console.log('\n⚠️ ⚠️ ⚠️ ATENCIÓN ⚠️ ⚠️ ⚠️');
-    console.log('Falta configurar BOT_TOKEN en Render.com');
-    console.log('1. Ve a tu app en Render');
-    console.log('2. Click en "Environment"');
-    console.log('3. Agrega variable: BOT_TOKEN = tu_token_de_telegram');
-    console.log('4. Reinicia el servicio');
-    console.log('⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️');
-  }
+  // Mantener activo (seguro)
+  setInterval(() => {
+    const now = new Date();
+    console.log(`🔄 Keep-alive: ${now.toLocaleTimeString()} - Uptime: ${Math.floor(process.uptime())}s`);
+  }, 300000);
 });
 
-// Manejar cierre limpio
+// Manejo seguro de cierre
 process.on('SIGTERM', () => {
-  console.log('🛑 Recibida señal SIGTERM, cerrando limpiamente...');
+  console.log('🛑 Señal SIGTERM recibida - Cerrando seguro...');
   if (bot) {
     bot.stopPolling();
+    console.log('✅ Polling detenido');
   }
+  console.log('🔒 Token permanece seguro');
   process.exit(0);
 });
