@@ -5,7 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Tu token de Telegram (se configura en Northflank)
-const TOKEN = process.env.BOT_TOKEN || 'PON_AQUI_TU_TOKEN_TEMPORAL';
+const TOKEN = process.env.BOT_TOKEN || '8356441967:AAEZ-oO0-AuIEmHw2moLpVUDq95CGEap_j0';
 
 // ===================== SERVIDOR WEB =====================
 // Ruta principal para verificar que está vivo
